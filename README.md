@@ -10,6 +10,14 @@ the preset buttons 1–6 no longer play radio. This free tool fixes that:
 - The buttons then work again on their own. The speaker itself takes care of your stations: you
   **don't need the Bose app, the Bose cloud or an extra device**, and the computer isn't needed anymore.
 
+<p align="center">
+  <img src="docs/screenshots/station-page.png" width="260" alt="Station page on a phone: buttons 1 to 3 with BBC Radio 2, SWR3 and FIP, each with Play and Change">
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/station-search.png" width="260" alt="Choosing a station for button 5: search for jazz, with Listen and Save to button 5">
+  <br>
+  <sub>The station page on your phone: see what's on each button, search for a station, save it to a button.</sub>
+</p>
+
 Tested on a **SoundTouch 10**. Other SoundTouch models will probably work, but have not been tested yet.
 
 > ⚠️ **Unofficial, use at your own risk.** This is a free community project, not made or supported by Bose.
@@ -59,6 +67,19 @@ versions are not guaranteed to work. See the [MIT License](LICENSE) for the lice
    - If your computer asks whether the program may accept incoming network connections, click **Allow**.
    - The speaker restarts, sometimes twice. This can take **several minutes**. Just wait.
 5. When it says **Done**, click **Open station page**.
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/screenshots/installer-home.png" alt="Installer: speaker Living Room found, ready to install, with Install button"></td>
+    <td width="33%"><img src="docs/screenshots/installer-install.png" alt="Installer progress: speaker is restarting, up to 5 minutes"></td>
+    <td width="33%"><img src="docs/screenshots/installer-done.png" alt="Installer: Done, with Open station page button"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>① It finds your speaker</sub></td>
+    <td align="center"><sub>② Click Install and wait</sub></td>
+    <td align="center"><sub>③ Done</sub></td>
+  </tr>
+</table>
 
 The installer saves a backup of your speaker's settings in a folder called `SoundTouch-Backup`
 in your home folder. **Keep it private:** it contains your Wi-Fi password.
