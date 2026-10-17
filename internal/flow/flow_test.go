@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -232,7 +233,8 @@ func TestInstallEndToEnd(t *testing.T) {
 	if b, _ := os.ReadFile(filepath.Join(wantDir, "speaker-nv.tar")); string(b) != "TARDATA" {
 		t.Errorf("tar content %q", b)
 	}
-	if st, err := os.Stat(wantDir); err == nil && st.Mode().Perm() != 0o700 {
+	// Windows has no Unix modes; there the user's home folder ACL keeps the backup private.
+	if st, err := os.Stat(wantDir); err == nil && runtime.GOOS != "windows" && st.Mode().Perm() != 0o700 {
 		t.Errorf("backup dir mode %v", st.Mode().Perm())
 	}
 	if f.installed["index.html"] != "<h1>page</h1>" || f.installed["cgi-bin/api"] != "api" {
