@@ -1,0 +1,13 @@
+#!/bin/sh
+# Lets the station page (same origin, port 8181) use the speaker's own web API (port 8090).
+# Only these endpoints are allowed: ?info ?presets ?now_playing ?storePreset ?select ?key ...
+case "$QUERY_STRING" in
+  info|presets|now_playing|volume|sources|storePreset|removePreset|select|key) ;;
+  *) printf 'Status: 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nnot allowed\n'; exit 0 ;;
+esac
+printf 'Content-Type: text/xml\r\nCache-Control: no-store\r\n\r\n'
+if [ "$REQUEST_METHOD" = POST ]; then
+  head -c "${CONTENT_LENGTH:-0}" | curl -s -m10 --data-binary @- "http://127.0.0.1:8090/$QUERY_STRING"
+else
+  curl -s -m10 "http://127.0.0.1:8090/$QUERY_STRING"
+fi

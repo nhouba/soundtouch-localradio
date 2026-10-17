@@ -1,0 +1,6 @@
+#!/bin/sh
+# Station lookup for the SoundTouch app. A preset's location is
+#   /cgi-bin/s?<base64url of the station JSON>
+# so each preset button carries its own stream URL; this just decodes it.
+printf 'Content-Type: application/json\r\n\r\n'
+echo "$QUERY_STRING" | tr -- '-_' '+/' | base64 -d

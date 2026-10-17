@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>SoundTouch Radio</title>
+<style>
+:root{--bg:#f5f4f0;--fg:#1b1b1f;--mu:#55555f;--card:#fff;--line:#d6d3cb;--acc:#0b57a4;--accfg:#fff;--ok:#1b6630;--warn:#8a4500;--err:#a3132b;--soft:#e9eef6}
+@media (prefers-color-scheme:dark){:root{--bg:#121316;--fg:#ececf0;--mu:#a8a8b4;--card:#1d1f24;--line:#383b45;--acc:#78b6ff;--accfg:#08111d;--ok:#74d68e;--warn:#ffb661;--err:#ff8d9c;--soft:#22303f}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:0 16px calc(7rem + env(safe-area-inset-bottom))}
+.wrap{max-width:60rem;margin:0 auto}
+header{padding:1.25rem 0 .5rem}
+h1{font-size:1.7rem;margin:0}
+h2{font-size:1.15rem;margin:0}
+.mu{color:var(--mu)}
+p{margin:.3rem 0}
+button,input{font:inherit;color:inherit}
+button{min-height:48px;min-width:48px;padding:.55rem 1rem;border-radius:12px;border:2px solid var(--acc);background:transparent;color:var(--acc);font-weight:600;cursor:pointer;touch-action:manipulation}
+button.pri{background:var(--acc);color:var(--accfg)}
+button:disabled{opacity:.55;cursor:default}
+button.link{border:0;min-height:44px;padding:.4rem .2rem;text-decoration:underline;font-weight:500}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+input{width:100%;min-height:50px;padding:.6rem .8rem;border:2px solid var(--line);border-radius:12px;background:var(--card)}
+input:focus{border-color:var(--acc)}
+label{display:block;font-weight:600;margin:.6rem 0 .3rem}
+#cards{list-style:none;margin:1rem 0;padding:0;display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(17rem,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:1rem;display:flex;flex-direction:column;gap:.5rem}
+.card.now{border:3px solid var(--acc)}
+.num{font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mu)}
+.st{font-size:1.25rem;font-weight:700;overflow-wrap:anywhere}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.err{color:var(--err)}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto}
+.row button{flex:1 1 auto}
+.badge{display:inline-block;background:var(--soft);border-radius:8px;padding:0 .45rem;font-size:.85rem;font-weight:700;margin-left:.3rem}
+.msg{border-radius:12px;padding:.7rem .9rem;margin:.6rem 0;background:var(--soft);font-weight:600}
+.msg:empty{display:none}
+.msg.err{color:var(--err)}.msg.ok{color:var(--ok)}
+#np{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:.6rem 16px calc(.6rem + env(safe-area-inset-bottom));box-shadow:0 -4px 16px rgba(0,0,0,.08)}
+#np .wrap{display:flex;align-items:center;gap:12px}
+#np .t{flex:1;min-width:0}
+#np .t b,#np .t span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+dialog{border:0;padding:0;background:var(--bg);color:var(--fg);width:100%;max-width:44rem;max-height:100%;height:100%;margin:0 auto}
+@media (min-width:700px){dialog{height:auto;max-height:90vh;margin:5vh auto;border-radius:18px}}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+.dh{position:sticky;top:0;background:var(--bg);display:flex;align-items:center;gap:8px;padding:calc(.7rem + env(safe-area-inset-top)) 16px .5rem;border-bottom:1px solid var(--line);z-index:1}
+.dh h2{flex:1}
+.db{padding:.5rem 16px 2rem}
+.sr{display:flex;gap:8px}
+.sr input{flex:1}
+#res{list-style:none;padding:0;margin:.5rem 0}
+#res li{display:grid;grid-template-columns:48px 1fr;gap:4px 12px;padding:.8rem 0;border-bottom:1px solid var(--line)}
+#res img{width:48px;height:48px;object-fit:contain;border-radius:8px;background:#fff}
+#res .i{grid-column:2;min-width:0}
+#res .i b{display:block;overflow-wrap:anywhere}
+#res .row{grid-column:1/3}
+#res li.noimg .i,#res li.noimg .row{grid-column:1/3}
+details{margin-top:1.2rem;border-top:1px solid var(--line);padding-top:.6rem}
+summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600;color:var(--acc)}
+footer{margin:2rem 0 1rem;font-size:.9rem;color:var(--mu)}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<h1 id="h1">SoundTouch Radio</h1>
+<p id="spk" class="mu"></p>
+</header>
+<main>
+<p id="hint" class="mu"></p>
+<div id="msg" class="msg" role="status" aria-live="polite"></div>
+<div id="retryBox" hidden><button id="retry" class="pri" type="button"></button></div>
+<ol id="cards" aria-labelledby="h1"></ol>
+</main>
+<footer><p><span id="ft"></span></p><p>soundtouch-localradio · <button id="langBtn" class="link" type="button"></button></p></footer>
+</div>
+
+<section id="np" aria-label="Now playing">
+<div class="wrap"><div class="t"><b id="npA"></b><span id="npB" class="mu"></span></div><button id="npBtn" type="button" hidden></button></div>
+</section>
+
+<dialog id="dlg" aria-labelledby="dT">
+<div class="dh"><h2 id="dT"></h2><button id="dX" type="button"></button></div>
+<div class="db">
+<p id="dCur" class="mu"></p>
+<form id="sF" role="search">
+<label for="q" id="qL"></label>
+<div class="sr"><input id="q" type="search" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search"><button id="sB" class="pri" type="submit"></button></div>
+</form>
+<div id="dMsg" class="msg" role="status" aria-live="polite"></div>
+<ul id="res"></ul>
+<details id="own"><summary id="oS"></summary>
+<form id="oF">
+<label for="oU" id="oUL"></label><input id="oU" type="url" inputmode="url" autocomplete="off" placeholder="https://">
+<label for="oN" id="oNL"></label><input id="oN" type="text" autocomplete="off">
+<div class="row" style="margin-top:.8rem"><button id="oL" type="button"></button><button id="oV" class="pri" type="submit"></button></div>
+</form>
+</details>
+</div>
+</dialog>
+
+<script>
+/*LIB*/
+var LIB = (function () {
+  function xmlEsc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+  }
+  function b64url(str) {
+    var bytes = new TextEncoder().encode(str), bin = '';
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_');
+  }
+  function unb64url(s) {
+    var bin = atob(s.replace(/-/g, '+').replace(/_/g, '/'));
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+  function stationJson(name, url, img) {
+    return JSON.stringify({ audio: { isRealtime: true, hasPlaylist: false, streamUrl: url },
+      imageUrl: img || '', name: name, streamType: 'liveRadio' });
+  }
+  function location(name, url, img) { return '/cgi-bin/s?' + b64url(stationJson(name, url, img)); }
+  function contentItem(name, url, img) {
+    return '<ContentItem source="LOCAL_INTERNET_RADIO" type="stationurl" location="' +
+      xmlEsc(location(name, url, img)) + '" sourceAccount="" isPresetable="true"><itemName>' +
+      xmlEsc(name) + '</itemName></ContentItem>';
+  }
+  function presetXml(id, name, url, img) {
+    return '<preset id="' + Number(id) + '">' + contentItem(name, url, img) + '</preset>';
+  }
+  function decodeLocation(loc) {
+    var m = /^\/cgi-bin\/s\?(.+)$/.exec(loc || '');
+    if (!m) return null;
+    try { return JSON.parse(unb64url(m[1])); } catch (e) { return null; }
+  }
+  function badStream(u) { return !/^https?:\/\//i.test(u || '') || /\.(m3u8?|pls|asx)(\?|#|$)/i.test(u); }
+  function rank(list) {
+    var seen = {}, out = [];
+    list.forEach(function (s) {
+      var u = (s.url_resolved || s.url || '').trim();
+      if (s.hls == 1 || badStream(u) || seen[u]) return;
+      seen[u] = 1; s.u = u; out.push(s);
+    });
+    function good(s) { return /^(MP3|AAC|AAC\+)$/i.test((s.codec || '').trim()) ? 0 : 1; }
+    return out.sort(function (a, b) { return good(a) - good(b) || (b.votes || 0) - (a.votes || 0); });
+  }
+  return { xmlEsc: xmlEsc, b64url: b64url, unb64url: unb64url, stationJson: stationJson, location: location,
+    contentItem: contentItem, presetXml: presetXml, decodeLocation: decodeLocation, badStream: badStream, rank: rank };
+})();
+if (typeof module !== 'undefined') module.exports = LIB;
+/*ENDLIB*/
+
+(function () {
+'use strict';
+var STR = {
+  en: {
+    hint: 'Pick a radio station for each button. Then just press the button on your speaker.',
+    connecting: 'Connecting to your speaker…', btn: 'Button {0}',
+    ok: '✓ Working', dead: '⚠ No longer works', deadHelp: 'This station came from a service that has shut down.',
+    empty: 'Empty', emptyHelp: 'No station saved yet.', other: '{0} preset', otherHelp: 'Set up in the Bose app — left as it is.',
+    nowBadge: 'Playing', play: '▶ Play', change: 'Change', choose: 'Choose station', findAgain: 'Find again',
+    dlg: 'Button {0}: choose a station', close: 'Close', cur: 'Currently: {0}',
+    qL: 'Search for a radio station', qPh: 'e.g. SWR3, BBC Radio 2, jazz', search: 'Search',
+    searching: 'Searching…', none: 'Nothing found. Try a shorter name or another spelling.', found: '{0} stations found.',
+    offline: "The station search isn't reachable right now. Check your internet connection and try again.",
+    listen: '▶ Listen', saveTo: 'Save to button {0}', previewing: 'Now playing on your speaker: {0}',
+    saving: 'Saving…', saved: 'Done! Button {0} now plays {1}.',
+    speaker: "The speaker isn't answering — it may be restarting. Try again in a minute.",
+    refused: "The speaker didn't accept that. Please try again or pick another station.",
+    retry: 'Try again', own: 'Enter a stream address yourself',
+    ownU: 'Stream address (starts with http:// or https://)', ownN: 'Station name', save: 'Save',
+    badUrl: 'Please enter an address that starts with http:// or https:// (not a playlist like .m3u or .pls).',
+    needName: 'Please give the station a name.',
+    np: 'Now playing', npOff: 'Speaker is off', npNone: 'Nothing playing', paused: 'Paused',
+    stop: '■ Stop', resume: '▶ Play', starting: 'Starting button {0}…', stopped: 'Stopped.',
+    unnamed: 'Unnamed station', footer: 'Works only in your home network.', lang: 'Deutsch', kbps: 'kbps'
+  },
+  de: {
+    hint: 'Wähle für jede Taste einen Radiosender. Danach einfach die Taste am Lautsprecher drücken.',
+    connecting: 'Verbinde mit deinem Lautsprecher…', btn: 'Taste {0}',
+    ok: '✓ Funktioniert', dead: '⚠ Funktioniert nicht mehr', deadHelp: 'Dieser Sender kam von einem Dienst, den es nicht mehr gibt.',
+    empty: 'Leer', emptyHelp: 'Noch kein Sender gespeichert.', other: '{0}-Favorit', otherHelp: 'In der Bose-App eingerichtet — bleibt unverändert.',
+    nowBadge: 'Läuft', play: '▶ Abspielen', change: 'Ändern', choose: 'Sender wählen', findAgain: 'Neu suchen',
+    dlg: 'Taste {0}: Sender wählen', close: 'Schließen', cur: 'Aktuell: {0}',
+    qL: 'Radiosender suchen', qPh: 'z. B. SWR3, Bayern 3, Jazz', search: 'Suchen',
+    searching: 'Suche läuft…', none: 'Nichts gefunden. Versuch einen kürzeren Namen oder eine andere Schreibweise.', found: '{0} Sender gefunden.',
+    offline: 'Die Sendersuche ist gerade nicht erreichbar. Prüfe die Internetverbindung und versuch es noch einmal.',
+    listen: '▶ Anhören', saveTo: 'Auf Taste {0} speichern', previewing: 'Läuft jetzt auf deinem Lautsprecher: {0}',
+    saving: 'Speichere…', saved: 'Fertig! Taste {0} spielt jetzt {1}.',
+    speaker: 'Der Lautsprecher antwortet nicht – vielleicht startet er gerade neu. Versuch es in einer Minute noch einmal.',
+    refused: 'Der Lautsprecher hat das nicht angenommen. Bitte noch einmal versuchen oder einen anderen Sender wählen.',
+    retry: 'Noch einmal versuchen', own: 'Streamadresse selbst eingeben',
+    ownU: 'Streamadresse (beginnt mit http:// oder https://)', ownN: 'Name des Senders', save: 'Speichern',
+    badUrl: 'Bitte eine Adresse eingeben, die mit http:// oder https:// beginnt (keine Playlist wie .m3u oder .pls).',
+    needName: 'Bitte gib dem Sender einen Namen.',
+    np: 'Läuft gerade', npOff: 'Lautsprecher ist aus', npNone: 'Es läuft nichts', paused: 'Pausiert',
+    stop: '■ Stopp', resume: '▶ Abspielen', starting: 'Starte Taste {0}…', stopped: 'Gestoppt.',
+    unnamed: 'Sender ohne Namen', footer: 'Funktioniert nur in deinem Heimnetz.', lang: 'English', kbps: 'kbit/s'
+  }
+};
+var lang = /^de/i.test(navigator.language || '') ? 'de' : 'en';
+try { var sl = localStorage.getItem('lang'); if (STR[sl]) lang = sl; } catch (e) {}
+function t(k) {
+  var s = STR[lang][k] || STR.en[k] || k, a = arguments;
+  return s.replace(/\{(\d)\}/g, function (_, i) { return a[+i + 1]; });
+}
+function $(id) { return document.getElementById(id); }
+function h(tag, attrs) {
+  var el = document.createElement(tag);
+  for (var k in attrs || {}) {
+    if (k === 'on') el.addEventListener('click', attrs.on);
+    else if (k === 'text') el.textContent = attrs.text;
+    else if (attrs[k] != null) el.setAttribute(k, attrs[k]);
+  }
+  for (var i = 2; i < arguments.length; i++) if (arguments[i]) el.appendChild(arguments[i]);
+  return el;
+}
+
+/* ---------- speaker API ---------- */
+function SpeakerError(kind) { this.kind = kind; }
+function timed(url, opt, ms) {
+  var c = window.AbortController ? new AbortController() : null, tm;
+  opt = opt || {};
+  if (c) { opt.signal = c.signal; tm = setTimeout(function () { c.abort(); }, ms); }
+  return fetch(url, opt).finally(function () { clearTimeout(tm); });
+}
+function api(path, body) {
+  var opt = body == null ? { cache: 'no-store' } :
+    { method: 'POST', body: body, headers: { 'Content-Type': 'text/plain' } };
+  return timed('/cgi-bin/api?' + path, opt, 12000).catch(function () { throw new SpeakerError('down'); })
+    .then(function (r) {
+      if (!r.ok) throw new SpeakerError('down');
+      return r.text();
+    }).then(function (txt) {
+      var doc = txt.trim() ? new DOMParser().parseFromString(txt, 'application/xml') : null;
+      if (!doc || doc.getElementsByTagName('parsererror').length) throw new SpeakerError('down');
+      if (doc.documentElement.nodeName === 'errors') throw new SpeakerError('refused');
+      return doc;
+    });
+}
+function errText(e) { return e && e.kind === 'refused' ? t('refused') : t('speaker'); }
+function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function key(k) {
+  var x = function (st) { return '<key state="' + st + '" sender="Gabbo">' + k + '</key>'; };
+  return api('key', x('press')).then(function () { return api('key', x('release')); });
+}
+function txt(el, tag) { var n = el && el.getElementsByTagName(tag)[0]; return n ? n.textContent.trim() : ''; }
+
+/* ---------- messages ---------- */
+function say(msg, kind, where) {
+  var el = where || ($('dlg').open ? $('dMsg') : $('msg'));
+  el.className = 'msg' + (kind ? ' ' + kind : '');
+  el.textContent = msg || '';
+}
+
+/* ---------- cards ---------- */
+var presets = {}, loaded = false, playingLoc = '', DEAD = { TUNEIN: 1 };
+function prettySource(s) {
+  if (/^SPOTIFY/.test(s)) return 'Spotify';
+  return s.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+}
+function loadPresets() {
+  return api('presets').then(function (doc) {
+    presets = {};
+    var ps = doc.getElementsByTagName('preset');
+    for (var i = 0; i < ps.length; i++) {
+      var ci = ps[i].getElementsByTagName('ContentItem')[0];
+      if (!ci) continue;
+      presets[ps[i].getAttribute('id')] = { source: ci.getAttribute('source') || '',
+        location: ci.getAttribute('location') || '', name: txt(ci, 'itemName') };
+    }
+    loaded = true; $('retryBox').hidden = true;
+    if ($('msg').className.indexOf('err') > -1) say('', '', $('msg'));
+    renderCards();
+  });
+}
+function renderCards() {
+  var ol = $('cards');
+  if (!loaded) return;
+  ol.textContent = '';
+  for (var n = 1; n <= 6; n++) (function (n) {
+    var p = presets[n], status, cls, help, name = '';
+    if (!p) { status = t('empty'); cls = 'mu'; help = t('emptyHelp'); }
+    else {
+      name = p.name || t('unnamed');
+      if (p.source === 'LOCAL_INTERNET_RADIO') { status = t('ok'); cls = 'ok'; }
+      else if (DEAD[p.source]) { status = t('dead'); cls = 'warn'; help = t('deadHelp'); }
+      else { status = t('other', prettySource(p.source)); cls = 'mu'; help = t('otherHelp'); }
+    }
+    var now = p && p.location && p.location === playingLoc;
+    var hid = 'c' + n;
+    var row = h('div', { 'class': 'row' });
+    if (p && !DEAD[p.source]) row.appendChild(h('button', { type: 'button', text: t('play'),
+      'aria-label': t('play') + ' – ' + t('btn', n), on: function () { pressPreset(n); } }));
+    if (p && DEAD[p.source]) row.appendChild(h('button', { type: 'button', 'class': 'pri', text: t('findAgain'),
+      'aria-describedby': hid, on: function (e) { openPanel(n, p.name, e.target); } }));
+    row.appendChild(h('button', { type: 'button', 'class': p ? '' : 'pri', text: p ? t('change') : t('choose'),
+      'aria-describedby': hid, on: function (e) { openPanel(n, '', e.target); } }));
+    var li = h('li', { 'class': 'card' + (now ? ' now' : ''), id: 'card' + n },
+      h('div', { 'class': 'num', id: hid, text: t('btn', n) }, now ? h('span', { 'class': 'badge', text: t('nowBadge') }) : null),
+      name ? h('div', { 'class': 'st', text: name }) : null,
+      h('div', { 'class': cls, text: status }),
+      help ? h('p', { 'class': 'mu', text: help }) : null,
+      row);
+    ol.appendChild(li);
+  })(n);
+}
+function pressPreset(n) {
+  say(t('starting', n));
+  key('PRESET_' + n).then(function () { say(''); return sleep(1500); })
+    .then(loadNow).catch(function (e) { say(errText(e), 'err'); });
+}
+
+/* ---------- now playing ---------- */
+var npState = '';
+function loadNow() {
+  return api('now_playing').then(function (doc) {
+    var r = doc.documentElement, src = r.getAttribute('source') || '', a = '', b = '';
+    var ci = r.getElementsByTagName('ContentItem')[0], was = playingLoc;
+    npState = txt(r, 'playStatus');
+    playingLoc = ci && src !== 'STANDBY' ? ci.getAttribute('location') || '' : '';
+    if (src === 'STANDBY') { a = t('npOff'); npState = 'OFF'; }
+    else if (src === 'INVALID_SOURCE' || !src) { a = t('npNone'); npState = 'OFF'; }
+    else {
+      a = txt(r, 'stationName') || txt(ci, 'itemName') || prettySource(src);
+      var art = txt(r, 'artist'), tr = txt(r, 'track');
+      b = [art, tr].filter(Boolean).join(' – ');
+      if (/PAUSE|STOP/.test(npState)) b = t('paused') + (b ? ' · ' + b : '');
+    }
+    $('npA').textContent = a; $('npB').textContent = b;
+    var btn = $('npBtn');
+    btn.hidden = npState === 'OFF';
+    btn.textContent = /PAUSE|STOP/.test(npState) ? t('resume') : t('stop');
+    if (was !== playingLoc) renderCards();
+  }).catch(function () { $('npA').textContent = t('np') + ': –'; $('npB').textContent = ''; $('npBtn').hidden = true; });
+}
+$('npBtn').addEventListener('click', function () {
+  var resume = /PAUSE|STOP/.test(npState);
+  key(resume ? 'PLAY' : 'PAUSE').then(function () { if (!resume) say(t('stopped')); return sleep(800); })
+    .then(loadNow).catch(function (e) { say(errText(e), 'err'); });
+});
+
+/* ---------- change panel ---------- */
+var dlg = $('dlg'), slot = 0, opener = null, seq = 0, deb, HOSTS = ['de1', 'fi1', 'at1', 'de2'];
+function openPanel(n, query, from) {
+  slot = n; opener = from;
+  $('dT').textContent = t('dlg', n);
+  var p = presets[n];
+  $('dCur').textContent = p ? t('cur', p.name || t('unnamed')) : '';
+  $('q').value = query || '';
+  $('res').textContent = ''; say('', '', $('dMsg'));
+  $('oU').value = ''; $('oN').value = ''; $('own').open = false;
+  $('oV').textContent = t('saveTo', n);
+  if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+  $('q').focus();
+  if (query) search();
+}
+function closePanel() {
+  if (dlg.close) dlg.close(); else dlg.removeAttribute('open');
+}
+dlg.addEventListener('close', function () { seq++; if (opener && document.contains(opener)) opener.focus(); });
+$('dX').addEventListener('click', closePanel);
+dlg.addEventListener('click', function (e) { if (e.target === dlg) closePanel(); });
+
+function rbFetch(qs) {
+  var i = 0;
+  function next() {
+    var host = HOSTS[i];
+    return timed('https://' + host + '.api.radio-browser.info/json/stations/search?' + qs, {}, 7000)
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (j) { if (i) HOSTS.unshift(HOSTS.splice(i, 1)[0]); return j; })
+      .catch(function () { if (++i < HOSTS.length) return next(); throw 0; });
+  }
+  return next();
+}
+function search() {
+  var q = $('q').value.trim(), my = ++seq;
+  clearTimeout(deb);
+  if (q.length < 2) return;
+  say(t('searching'));
+  var base = '&limit=40&hidebroken=true&order=votes&reverse=true', e = encodeURIComponent(q);
+  Promise.all([rbFetch('name=' + e + base), rbFetch('tag=' + e.toLowerCase() + base).catch(function () { return []; })])
+    .then(function (r) {
+      if (my !== seq) return;
+      var list = LIB.rank(r[0]).concat(LIB.rank(r[1]));
+      var seen = {}; list = list.filter(function (s) { return seen[s.u] ? 0 : (seen[s.u] = 1); }).slice(0, 40);
+      showResults(list);
+      say(list.length ? t('found', list.length) : t('none'));
+    }).catch(function () { if (my === seq) { $('res').textContent = ''; say(t('offline'), 'err'); } });
+}
+var regionNames;
+try { regionNames = new Intl.DisplayNames([lang], { type: 'region' }); } catch (e) {}
+function country(s) {
+  try { if (regionNames && s.countrycode) return regionNames.of(s.countrycode.toUpperCase()); } catch (e) {}
+  return s.country || '';
+}
+function showResults(list) {
+  var ul = $('res');
+  ul.textContent = '';
+  list.forEach(function (s) {
+    var name = (s.name || '').trim() || t('unnamed'), img = null;
+    var fav = /^https?:\/\//.test(s.favicon || '') && s.favicon.length < 300 ? s.favicon : '';
+    var codec = [(s.codec || '').trim(), s.bitrate ? s.bitrate + ' ' + t('kbps') : ''].filter(Boolean).join(' ');
+    var li = h('li', fav ? null : { 'class': 'noimg' });
+    if (fav) {
+      img = h('img', { src: fav, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer', width: 48, height: 48 });
+      img.onerror = function () { img.remove(); li.className = 'noimg'; };
+      li.appendChild(img);
+    }
+    li.appendChild(h('div', { 'class': 'i' }, h('b', { text: name }),
+      h('span', { 'class': 'mu', text: [country(s), codec].filter(Boolean).join(' · ') })));
+    li.appendChild(h('div', { 'class': 'row' },
+      h('button', { type: 'button', text: t('listen'), 'aria-label': t('listen') + ': ' + name,
+        on: function () { preview(name, s.u, fav); } }),
+      h('button', { type: 'button', 'class': 'pri', text: t('saveTo', slot), 'aria-label': t('saveTo', slot) + ': ' + name,
+        on: function (e) { save(name, s.u, fav, e.target); } })));
+    ul.appendChild(li);
+  });
+}
+function preview(name, url, img) {
+  api('select', LIB.contentItem(name, url, img)).then(function () {
+    say(t('previewing', name), 'ok'); return sleep(1500);
+  }).then(loadNow).catch(function (e) { say(errText(e), 'err'); });
+}
+function save(name, url, img, btn) {
+  var n = slot;
+  if (btn) btn.disabled = true;
+  say(t('saving'));
+  api('storePreset', LIB.presetXml(n, name, url, img)).then(function () {
+    closePanel();
+    say(t('saved', n, name), 'ok', $('msg'));
+    return loadPresets().catch(function () {});
+  }).then(function () {
+    var c = $('card' + n); if (c) { c.setAttribute('tabindex', '-1'); c.focus(); c.scrollIntoView({ block: 'center' }); }
+  }).catch(function (e) { if (btn) btn.disabled = false; say(errText(e), 'err'); });
+}
+$('sF').addEventListener('submit', function (e) { e.preventDefault(); search(); });
+$('q').addEventListener('input', function () { clearTimeout(deb); deb = setTimeout(search, 700); });
+function ownVals() {
+  var u = $('oU').value.trim(), n = $('oN').value.trim();
+  if (LIB.badStream(u)) { say(t('badUrl'), 'err'); $('oU').focus(); return null; }
+  return { u: u, n: n };
+}
+$('oL').addEventListener('click', function () { var v = ownVals(); if (v) preview(v.n || v.u, v.u, ''); });
+$('oF').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var v = ownVals(); if (!v) return;
+  if (!v.n) { say(t('needName'), 'err'); $('oN').focus(); return; }
+  save(v.n, v.u, '', $('oV'));
+});
+
+/* ---------- start ---------- */
+function applyLang() {
+  document.documentElement.lang = lang;
+  $('hint').textContent = t('hint');
+  $('retry').textContent = t('retry');
+  $('ft').textContent = t('footer');
+  $('langBtn').textContent = t('lang');
+  $('langBtn').setAttribute('lang', lang === 'de' ? 'en' : 'de');
+  $('np').setAttribute('aria-label', t('np'));
+  $('dX').textContent = t('close');
+  $('qL').textContent = t('qL'); $('q').placeholder = t('qPh'); $('sB').textContent = t('search');
+  $('oS').textContent = t('own'); $('oUL').textContent = t('ownU'); $('oNL').textContent = t('ownN');
+  $('oL').textContent = t('listen');
+  renderCards();
+}
+$('langBtn').addEventListener('click', function () {
+  lang = lang === 'de' ? 'en' : 'de';
+  try { localStorage.setItem('lang', lang); } catch (e) {}
+  try { regionNames = new Intl.DisplayNames([lang], { type: 'region' }); } catch (e) {}
+  applyLang(); loadNow();
+});
+function start() {
+  say(t('connecting'));
+  api('info').then(function (doc) {
+    var n = txt(doc.documentElement, 'name');
+    $('spk').textContent = n;
+    if (n) document.title = 'SoundTouch Radio – ' + n;
+  }).catch(function () {});
+  loadPresets().then(function () { say(''); loadNow(); }).catch(function (e) {
+    say(errText(e), 'err'); $('retryBox').hidden = false; loaded = false; $('cards').textContent = '';
+  });
+}
+$('retry').addEventListener('click', start);
+applyLang();
+start();
+setInterval(function () { if (!document.hidden && !dlg.open) loadNow(); }, 6000);
+document.addEventListener('visibilitychange', function () { if (!document.hidden) loadPresets().then(loadNow).catch(function () {}); });
+})();
+</script>
+</body>
+</html>

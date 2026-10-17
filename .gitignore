@@ -1,0 +1,7 @@
+backups/
+*.tar
+build/
+.speaker
+__pycache__/
+.DS_Store
+dist/

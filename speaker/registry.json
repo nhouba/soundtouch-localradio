@@ -1,0 +1,46 @@
+{
+  "_links": {
+    "bmx_services_availability": {
+      "href": "../servicesAvailability"
+    }
+  },
+  "askAgainAfter": 86400,
+  "bmx_services": [
+    {
+      "_links": {
+        "bmx_token": {
+          "href": "/token"
+        },
+        "self": {
+          "href": "/"
+        }
+      },
+      "askAdapter": false,
+      "assets": {
+        "color": "#000000",
+        "name": "Custom Stations",
+        "description": "Local radio stations (served by the speaker itself)",
+        "icons": {
+          "largeSvg": "https://media.bose.io/bmx-icons/orion/monochrome.svg",
+          "monochromePng": "https://media.bose.io/bmx-icons/orion/monochrome_v2.png",
+          "monochromeSvg": "https://media.bose.io/bmx-icons/orion/monochrome.svg",
+          "smallSvg": "https://media.bose.io/bmx-icons/orion/monochrome.svg"
+        }
+      },
+      "authenticationModel": {
+        "anonymousAccount": {
+          "autoCreate": true,
+          "enabled": true
+        }
+      },
+      "baseUrl": "http://127.0.0.1:8181",
+      "id": {
+        "name": "LOCAL_INTERNET_RADIO",
+        "value": 11
+      },
+      "streamTypes": [
+        "liveRadio"
+      ]
+    }
+  ]
+}
