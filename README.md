@@ -54,13 +54,24 @@ versions are not guaranteed to work. See the [MIT License](LICENSE) for the lice
 
 1. **Download** the installer for your computer from the
    [Releases page](https://github.com/nhouba/soundtouch-localradio/releases):
-   - Mac with Apple chip (M1 or newer): `…-macos-arm64`
-   - Older Mac (Intel): `…-macos-x64`
-   - Windows: `…-windows-x64.exe`
+   - Mac (any Mac): `SoundTouch-Radio-Installer-macos.zip`
+   - Windows: `SoundTouch-Radio-Installer-windows-x64.exe`
    - Linux: `…-linux-x64` (or `…-linux-arm64`, e.g. Raspberry Pi). Make it executable
      (`chmod +x` the file) and start it.
-2. **Open** the downloaded file.
-   - **Mac:** if it says the developer can't be verified, right-click the file, choose **Open**, then **Open** again.
+2. **Open** it.
+   - **Mac:** double-click the zip file. You get **SoundTouch Radio Installer**; double-click it.
+     The first time, your Mac blocks it ("Apple could not verify…"), because this free project
+     isn't registered with Apple. To allow it once:
+     1. Click **Done**.
+     2. Open **System Settings → Privacy & Security** and scroll down.
+     3. Next to "SoundTouch Radio Installer was blocked", click **Open Anyway** and confirm.
+     4. A Terminal window opens and runs the installer. Leave it open until you're done.
+
+     **Or, without the blocking:** open the **Terminal** app, paste this line and press Enter:
+
+     ```sh
+     curl -fL -o ~/Downloads/SoundTouch-Radio-Installer https://github.com/nhouba/soundtouch-localradio/releases/latest/download/SoundTouch-Radio-Installer-macos && chmod +x ~/Downloads/SoundTouch-Radio-Installer && ~/Downloads/SoundTouch-Radio-Installer
+     ```
    - **Windows:** if a blue "Windows protected your PC" window appears, click **More info**, then **Run anyway**.
 3. A page opens in your web browser and **finds your speaker**.
 4. Click **Install**.
@@ -174,11 +185,14 @@ Each release has a `SHA256SUMS.txt`. To check a downloaded installer:
 - Windows (PowerShell): `Get-FileHash .\SoundTouch-Radio-Installer-windows-x64.exe`
 
 The result must match the line for that file in `SHA256SUMS.txt`. The installers are not
-code-signed, which is why macOS and Windows show a warning the first time.
+code-signed with a paid developer certificate (the Mac ones are only ad-hoc signed and not
+notarized), which is why macOS and Windows show a warning the first time.
 
 ## Building
 
-The installer is Go (stdlib only): `sh build.sh` builds all targets into `dist/`;
+The installer is Go (stdlib only): `sh build.sh` builds all targets into `dist/` (on a Mac it
+also makes the universal Mac app zip from `packaging/macos/`; the app just opens the installer
+in Terminal);
 `go test ./...` runs the tests. Tagging `v*` builds the release via GitHub Actions.
 `python3 tools/mock_speaker.py` serves the station page with a fake speaker on 127.0.0.1:8181.
 

@@ -25,7 +25,8 @@ jobs:
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: test
-    runs-on: ubuntu-latest
+    # macOS runner: the Mac app is made with lipo, codesign and ditto
+    runs-on: macos-latest
     permissions:
       contents: write
     steps:
@@ -38,7 +39,7 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: sh build.sh
       - name: Checksums
-        run: cd dist && sha256sum SoundTouch-Radio-Installer-* > SHA256SUMS.txt
+        run: cd dist && shasum -a 256 SoundTouch-Radio-Installer-* > SHA256SUMS.txt
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}

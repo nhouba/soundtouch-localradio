@@ -1,0 +1,4 @@
+#!/bin/sh
+# Main program of the Mac app: shows the installer in a Terminal window, exactly like
+# starting the plain program, so it can be watched and closed (and started again).
+exec open -a Terminal "$(dirname "$0")/installer"
