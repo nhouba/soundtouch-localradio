@@ -26,12 +26,13 @@ import time
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+import zlib
 from pathlib import Path
 from xml.sax.saxutils import escape
 
 ROOT = Path(__file__).resolve().parent
 SPEAKER_FILES = ROOT / "speaker"              # copied to /mnt/nv/localradio on the speaker
-SERVED = ("registry.json", "index.html", "cgi-bin/s", "cgi-bin/api")
+SERVED = ("registry.json", "index.html", "cgi-bin/s", "cgi-bin/api", "setup")
 BACKUPS = ROOT / "backups"
 SPEAKER_FILE = ROOT / ".speaker"              # remembers the speaker's IP (git-ignored)
 REG = "http://127.0.0.1:8181/registry.json"   # registry served by the speaker itself
@@ -201,6 +202,13 @@ def hook_runtime():
             f"start-stop-daemon -S -b -x /bin/sh -- -c 'sleep 25;{resend};sleep 60;{resend}';fi")
 
 
+def hook_setup(srv):
+    # Download and run speaker/setup (makes LOCAL_INTERNET_RADIO registrable on a
+    # never-paired speaker; a no-op on paired speakers). Ends with ';'.
+    return (f"curl -sf -m10 -o /tmp/lr-setup {srv}/f/setup;"
+            "if [ -s /tmp/lr-setup ];then sh /tmp/lr-setup;fi;")
+
+
 def hook_install(srv):
     backup = (f"(cd /mnt/nv;tar cf - BoseApp-Persistence OverrideSdkPrivateCfg.xml)"
               f"|curl -s -m30 -T - {srv}/up/speaker-nv.tar;")
@@ -209,11 +217,20 @@ def hook_install(srv):
             f"for f in index.html cgi-bin/s cgi-bin/api;do curl -sf -m10 -o $f.new {srv}/f/$f;"
             "if [ -s $f.new ];then mv $f.new $f;fi;done;"
             "mv /tmp/lr-registry.json registry.json;chmod 755 cgi-bin/s cgi-bin/api;"
-            f"{backup}ls -laR|curl -s -m5 -T - {srv}/up/done.txt;fi;" + hook_runtime())
+            + hook_setup(srv)
+            + f"{backup}ls -laR|curl -s -m5 -T - {srv}/up/done.txt;fi;" + hook_runtime())
 
 
-def set_hook(ip, hook, reboot):
-    cmds = [f"sys configuration bmxRegistryUrl {REG}", f'envswitch boseurls set ";{hook} ;" ;']
+def local_account_id(device_id):
+    """Stable 7-digit local account id for a speaker that has no Bose account."""
+    return str(1000000 + (zlib.crc32(device_id.encode()) % 9000000))
+
+
+def set_hook(ip, hook, reboot, account_id=""):
+    cmds = []
+    if account_id:
+        cmds.append(f"envswitch accountid set {account_id}")  # "pair" an unpaired speaker
+    cmds += [f"sys configuration bmxRegistryUrl {REG}", f'envswitch boseurls set ";{hook} ;" ;']
     if reboot:
         cmds.append("sys reboot")
     out = console(ip, *cmds)
@@ -280,8 +297,13 @@ def cmd_install(args):
     fw = re.search(r"<softwareVersion>(\d+)", info)
     if not fw or int(fw.group(1)) < 27:
         die("firmware 27.x or newer required")
+    account_id = ""
     if not re.search(r"<margeAccountUUID>\w+", info):
-        print("warning: speaker looks factory-reset/unpaired (no margeAccountUUID); untested")
+        # Never paired to a Bose account (set up after the cloud shutdown): assign a
+        # local id so the boot hook runs, and the setup script fixes the radio source.
+        dev = re.search(r'deviceID="([^"]+)"', info)
+        account_id = local_account_id(dev.group(1) if dev else ip)
+        print(f"speaker has no Bose account; assigning local account {account_id}")
     try:
         socket.create_connection((ip, 17000), timeout=3).close()
     except OSError:
@@ -294,15 +316,22 @@ def cmd_install(args):
     srv, done = start_server(bdir)
     url = f"http://{local_ip_towards(ip)}:{srv.server_address[1]}"
     print(f"Installing on {ip}. The speaker restarts (up to 5 minutes) ...")
-    set_hook(ip, hook_install(url), reboot=True)
+    set_hook(ip, hook_install(url), reboot=True, account_id=account_id)
     if not done.wait(360):
         srv.shutdown()
         die("speaker did not fetch the files within 6 min (firewall? see README troubleshooting)")
     srv.shutdown()
     set_hook(ip, hook_runtime(), reboot=False)  # drop the download part again
     print(f"Backup saved in {bdir} (contains device keys + Wi-Fi password, keep private)")
-    print("Waiting for the speaker to load the station list ...", flush=True)
-    time.sleep(40)
+    if account_id:
+        # The setup script rewrote Sources.xml during the install boot, but the app
+        # had already read the old one. Reboot so it loads the new radio source.
+        print("Rebooting so the speaker loads the new radio source ...", flush=True)
+        console(ip, "sys reboot")
+        time.sleep(90)
+    else:
+        print("Waiting for the speaker to load the station list ...", flush=True)
+        time.sleep(40)
     print(f"Done. Station page: http://{ip}:8181/   or: ./radio set 1 \"station name\"")
 
 

@@ -1,0 +1,39 @@
+#!/bin/sh
+# Make LOCAL_INTERNET_RADIO registrable on a SoundTouch speaker that was never
+# paired to a Bose account (set up with the app after the cloud shutdown, so its
+# margeAccountUUID is empty).
+#
+# The firmware builds its runtime source table from Sources.xml at boot. It only
+# keeps a LOCAL_INTERNET_RADIO source whose secret is a well-formed base64
+# {"serial": "<uuid>"} token; a missing or empty secret is dropped, and an
+# unpaired speaker never receives one from the (now dead) cloud. A cloud-paired
+# speaker already has a valid token, so leave those untouched.
+#
+# Runs as root from the boot hook. The new file is read by the firmware on the
+# NEXT boot, so the installer reboots once more after this runs.
+SRC=$(find /mnt/nv -name Sources.xml 2>/dev/null | head -1)
+[ -n "$SRC" ] || exit 0
+
+# A valid serial token is the base64 of {"serial": ... , which always starts
+# with "eyJzZXJpYWwi". If one is already present the speaker was paired; do
+# nothing so a working speaker is never disturbed.
+if grep -q eyJzZXJpYWwi "$SRC" 2>/dev/null; then
+	exit 0
+fi
+
+UUID=$(cat /proc/sys/kernel/random/uuid 2>/dev/null)
+[ -n "$UUID" ] || exit 0
+SECRET=$(printf '{"serial": "%s"}' "$UUID" | base64 | tr -d '\n')
+[ -n "$SECRET" ] || exit 0
+
+cat > "$SRC" <<XML
+<?xml version="1.0" encoding="UTF-8" ?>
+<sources>
+    <source displayName="AUX IN" secret="">
+        <sourceKey type="AUX" account="AUX" />
+    </source>
+    <source secret="$SECRET" secretType="token">
+        <sourceKey type="LOCAL_INTERNET_RADIO" account="" />
+    </source>
+</sources>
+XML

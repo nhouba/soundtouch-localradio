@@ -24,6 +24,9 @@ import (
 
 const infoXML = `<?xml version="1.0" encoding="UTF-8" ?><info deviceID="A0B1C2D3E4F5"><name>Kitchen</name><type>SoundTouch 10</type><margeAccountUUID>1234567</margeAccountUUID><components><component><componentCategory>SCM</componentCategory><softwareVersion>27.0.3.4629.5041371 epdbuild.trunk.hepdswbld04.2022-08-04T11:20:29</softwareVersion><serialNumber>X</serialNumber></component></components></info>`
 
+// infoUnpairedXML is a speaker with no Bose account (set up after the shutdown).
+const infoUnpairedXML = `<?xml version="1.0" encoding="UTF-8" ?><info deviceID="A0B1C2D3E4F5"><name>Kitchen</name><type>SoundTouch 10</type><margeAccountUUID></margeAccountUUID><components><component><componentCategory>SCM</componentCategory><softwareVersion>27.0.3.4629.5041371 epdbuild.trunk.hepdswbld04.2022-08-04T11:20:29</softwareVersion><serialNumber>X</serialNumber></component></components></info>`
+
 // fakeSpeaker emulates the speaker's API, console and boot hook on localhost.
 type fakeSpeaker struct {
 	t       *testing.T
@@ -31,27 +34,38 @@ type fakeSpeaker struct {
 	page    *httptest.Server
 	console net.Listener
 
-	mu        sync.Mutex
-	cmds      []string
-	hook      string
-	installed map[string]string
-	pageUp    bool
-	reject    bool
-	noBoot    bool
-	stalls    int // boots that stop after the first download (seen on a real SoundTouch 10)
-	boots     int
+	mu          sync.Mutex
+	info        string
+	cmds        []string
+	hook        string
+	account     string
+	setupDone   bool // the setup script rewrote Sources.xml (install boot, unpaired)
+	installed   map[string]string
+	pageUp      bool
+	sourceReady bool
+	reject      bool
+	noBoot      bool
+	stalls      int // boots that stop after the first download (seen on a real SoundTouch 10)
+	boots       int
 }
 
 func newFakeSpeaker(t *testing.T) *fakeSpeaker {
-	f := &fakeSpeaker{t: t, installed: map[string]string{}}
+	f := &fakeSpeaker{t: t, info: infoXML, installed: map[string]string{}}
 	f.api = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
+		info, ready := f.info, f.sourceReady
+		f.mu.Unlock()
 		switch r.URL.Path {
 		case "/info":
-			io.WriteString(w, infoXML)
+			io.WriteString(w, info)
 		case "/presets":
 			io.WriteString(w, "<presets/>")
 		case "/sources":
-			io.WriteString(w, "<sources/>")
+			if ready {
+				io.WriteString(w, `<sources><sourceItem source="AUX" status="READY"/><sourceItem source="LOCAL_INTERNET_RADIO" status="READY"/></sources>`)
+			} else {
+				io.WriteString(w, "<sources/>")
+			}
 		default:
 			http.NotFound(w, r)
 		}
@@ -100,6 +114,7 @@ func (f *fakeSpeaker) serveConsole() {
 }
 
 var envswitchRe = regexp.MustCompile(`^envswitch boseurls set (.*)$`)
+var accountRe = regexp.MustCompile(`^envswitch accountid set (\S+)$`)
 
 func (f *fakeSpeaker) handleConsole(conn net.Conn) {
 	defer conn.Close()
@@ -116,6 +131,13 @@ func (f *fakeSpeaker) handleConsole(conn net.Conn) {
 			f.hook = m[1]
 			f.mu.Unlock()
 			io.WriteString(conn, "->Setting Bose Server URLs to "+m[1]+"\r\nOK\r\n")
+			continue
+		}
+		if m := accountRe.FindStringSubmatch(line); m != nil {
+			f.mu.Lock()
+			f.account = m[1]
+			f.mu.Unlock()
+			io.WriteString(conn, "->Setting AccountId to "+m[1]+"\r\nOK\r\n")
 			continue
 		}
 		if line == "sys reboot" {
@@ -139,7 +161,20 @@ func (f *fakeSpeaker) boot() {
 		f.stalls--
 	}
 	f.mu.Unlock()
-	if noBoot || !strings.Contains(h, "/f/registry.json") {
+	if noBoot {
+		return
+	}
+	if !strings.Contains(h, "/f/registry.json") {
+		// The runtime-only hook (after finalize): httpd serves the page, and the
+		// patched Sources.xml now registers the radio source on an unpaired speaker.
+		if strings.Contains(h, "busybox httpd") {
+			f.mu.Lock()
+			f.pageUp = true
+			if f.setupDone {
+				f.sourceReady = true
+			}
+			f.mu.Unlock()
+		}
 		return
 	}
 	srv := srvRe.FindString(h)
@@ -172,6 +207,11 @@ func (f *fakeSpeaker) boot() {
 	}
 	f.mu.Lock()
 	f.pageUp = true
+	if f.account != "" {
+		// An unpaired speaker: the setup script ran during this install boot and
+		// rewrote Sources.xml (the app only picks it up on the next boot).
+		f.setupDone = true
+	}
 	f.mu.Unlock()
 }
 
@@ -196,6 +236,7 @@ var fastTiming = Timing{
 	PageTimeout:   2 * time.Second,
 	StallTimeout:  300 * time.Millisecond,
 	MaxRestarts:   2,
+	SourceTimeout: 2 * time.Second,
 }
 
 func newRunner(f *fakeSpeaker, root string) *Runner {
@@ -242,7 +283,7 @@ func TestInstallEndToEnd(t *testing.T) {
 	}
 
 	srv := srvRe.FindString(f.cmds[1])
-	want := append(hook.InstallCommands(srv), hook.FinalizeCommands()...)
+	want := append(hook.InstallCommands(srv, ""), hook.FinalizeCommands()...)
 	if strings.Join(f.cmds, "\n") != strings.Join(want, "\n") {
 		t.Errorf("console commands:\n%q\nwant\n%q", f.cmds, want)
 	}
@@ -258,6 +299,37 @@ func TestInstallEndToEnd(t *testing.T) {
 	}
 	if strings.Join(rec.steps, ",") != strings.Join(wantSteps, ",") {
 		t.Errorf("steps %v", rec.steps)
+	}
+}
+
+func TestInstallUnpaired(t *testing.T) {
+	f := newFakeSpeaker(t)
+	f.info = infoUnpairedXML
+	root := filepath.Join(t.TempDir(), "SoundTouch-Backup")
+	r := newRunner(f, root)
+	res, err := r.Install(context.Background(), "127.0.0.1", &recorder{})
+	if err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	if !res.Unpaired {
+		t.Error("result should report Unpaired")
+	}
+	if !res.PageUp || !res.SourceReady {
+		t.Errorf("result %+v (want PageUp and SourceReady)", res)
+	}
+	want := "envswitch accountid set " + localAccountID("A0B1C2D3E4F5")
+	if len(f.cmds) == 0 || f.cmds[0] != want {
+		t.Errorf("first command %q, want %q as command 0", f.cmds, want)
+	}
+	f.mu.Lock()
+	acc, boots := f.account, f.boots
+	f.mu.Unlock()
+	if acc != localAccountID("A0B1C2D3E4F5") {
+		t.Errorf("account %q not assigned", acc)
+	}
+	// Two reboots: the install reboot and the one that loads the new radio source.
+	if boots != 2 {
+		t.Errorf("boots %d, want 2", boots)
 	}
 }
 

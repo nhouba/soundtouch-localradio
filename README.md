@@ -29,8 +29,9 @@ Tested on a **SoundTouch 10**. Other SoundTouch models will probably work, but h
 - Your SoundTouch speaker, switched on and **already connected to your Wi-Fi**
   (as it was when you used it with the Bose app)
 - A computer (Mac, Windows or Linux) in the **same Wi-Fi**, only for the installation
-- The speaker should still be set up the way it was with the Bose app.
-  **Don't reset it to factory settings** before installing (see below).
+- The speaker just needs to be connected to your Wi-Fi (with the Bose app, as before).
+  A speaker with no Bose account — factory-reset, or first set up after the shutdown — works
+  too; the installer sets it up automatically (see below).
 
 ## Disclaimer
 
@@ -116,9 +117,11 @@ You can also do it the usual Bose way: while a station is playing, hold a button
   with the SoundTouch app (Bose says setup still works after the shutdown). The speaker also has a
   built-in setup page on its own temporary Wi-Fi, which you could try without the app. We haven't
   tested that.
-- **The speaker was reset to factory settings or set up again from scratch:** this has not been
-  tested. Bose says basic setup still works in the updated SoundTouch app, but we can't promise
-  that this tool works on such a speaker.
+- **The speaker was reset to factory settings or set up with the app after the shutdown** (it has
+  no Bose account): this is supported. The installer notices there is no account, assigns a local
+  one and fixes the radio source automatically. It reboots the speaker once more at the end, so
+  after it finishes the station buttons can take a minute or two before they start working. Just
+  connect the speaker to your Wi-Fi with the SoundTouch app first.
 - **Installation stops while the speaker is restarting:** unplug the speaker for 10 seconds,
   plug it back in, wait 2 minutes and run the installer again. That is safe.
 - **A station doesn't play:** choose another entry for the same station in the search results.
@@ -163,6 +166,18 @@ server; a hook makes the speaker download the files on its next boot with its ow
 a config backup, and report back; then the hook is replaced by the runtime-only hook. On a
 SoundTouch 10 the download sometimes stops on the first boot; the installer then restarts the
 speaker automatically (up to twice).
+
+**Speakers with no Bose account** (factory-reset, or first set up with the app after the
+shutdown — empty `margeAccountUUID`) need two extra things, which the installer does automatically:
+
+- the boot hook only runs on a "paired" speaker, so the installer first assigns a **local account
+  id** with `envswitch accountid set <id>` (a number derived from the device id, never another
+  speaker's real id);
+- the firmware builds its source table from `Sources.xml` at boot and only keeps a
+  `LOCAL_INTERNET_RADIO` source whose secret is a valid `{"serial":"<uuid>"}` token — an unpaired
+  speaker has none, so the downloaded `speaker/setup` script writes one. Because the app reads
+  `Sources.xml` at the *start* of a boot, the installer reboots once more so the new source
+  registers; the button then appears a minute or two after that reboot.
 
 ## Command line tool
 
@@ -212,8 +227,14 @@ in Terminal);
 - Preset locations of 800+ characters work; https and http streams both play (firmware 27.0.3);
   HLS (`.m3u8`) and playlist files don't.
 - The speaker's `curl -T -` uploads use chunked transfer encoding.
-- Factory-reset / unpaired speakers (empty `margeAccountUUID`) are reported by other projects
-  not to run the hook and to reject radio with error 1005. Untested here.
+- Unpaired speakers (empty `margeAccountUUID`) do **not** run the boot hook at all: with the marge
+  URL pointed at a listener a factory-fresh speaker makes zero requests. Assigning any account id
+  with `envswitch accountid set <id>` makes it run the hook again.
+- Even then the radio source stays hidden until `Sources.xml` lists a `LOCAL_INTERNET_RADIO`
+  `<source>` whose `secret` is the base64 of `{"serial":"<uuid>"}` with `secretType="token"`. An
+  empty secret is dropped (the firmware tries to validate it against the dead cloud); a paired
+  speaker still has a valid one from its cloud days. The registry is **not** enough on its own —
+  the source table comes from `Sources.xml` / the marge account server, not from `bmxRegistryUrl`.
 
 ## Security and privacy
 

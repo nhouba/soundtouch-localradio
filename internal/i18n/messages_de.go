@@ -24,7 +24,7 @@ func init() {
 
 		"pre.firmware": "Dieser Lautsprecher hat Firmware %s. Nötig ist Version 27 oder neuer. Aktualisiere zuerst den Lautsprecher (SoundTouch-App, Einstellungen, Lautsprechereinstellungen) und suche dann erneut.",
 		"pre.console":  "Der Installer erreicht den Service-Port (17000) des Lautsprechers nicht. Prüfe, ob dieser Computer im selben Netzwerk ist (kein Gäste-WLAN), zieh den Stecker des Lautsprechers für 10 Sekunden, warte 2 Minuten und suche erneut.",
-		"pre.unpaired": "Dieser Lautsprecher scheint auf Werkseinstellungen zurückgesetzt oder nicht eingerichtet zu sein (kein Konto). Das ist ungetestet und funktioniert möglicherweise nicht.",
+		"pre.unpaired": "Dieser Lautsprecher hat kein Bose-Konto (nach der Abschaltung der Bose-Cloud eingerichtet). Der Installer richtet das automatisch ein; am Ende startet er den Lautsprecher noch einmal neu, daher können die Sendertasten ein bis zwei Minuten brauchen, bis sie funktionieren.",
 
 		"inst.title":    "Installation auf %s",
 		"inst.firewall": "Falls dein Computer fragt, ob dieses Programm eingehende Netzwerkverbindungen annehmen darf, klicke auf Erlauben. Der Lautsprecher lädt ein paar Dateien von diesem Computer.",
