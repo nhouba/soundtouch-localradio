@@ -82,8 +82,8 @@ func (c *Console) Close() error {
 // ErrHookRejected means the speaker did not confirm "envswitch boseurls set".
 var ErrHookRejected = errors.New("speaker did not confirm the new server URLs")
 
-// RunCommands sends cmds in one console session. After an "envswitch" command
-// the reply must contain "Setting Bose Server URLs"; otherwise no further
+// RunCommands sends cmds in one console session. After an "envswitch boseurls"
+// command the reply must contain "Setting Bose Server URLs"; otherwise no further
 // command (in particular no reboot) is sent and ErrHookRejected is returned.
 // Errors after "sys reboot" are ignored (the speaker drops the connection).
 func RunCommands(ctx context.Context, addr string, delay time.Duration, cmds []string) (string, error) {
@@ -101,7 +101,7 @@ func RunCommands(ctx context.Context, addr string, delay time.Duration, cmds []s
 		if err != nil {
 			return out, err
 		}
-		if strings.HasPrefix(cmd, "envswitch ") {
+		if strings.HasPrefix(cmd, "envswitch boseurls ") {
 			n := strings.Count(out, "Setting Bose Server URLs")
 			if n <= confirmed {
 				// slow speaker: give it a few more seconds

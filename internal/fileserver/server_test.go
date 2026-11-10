@@ -21,6 +21,7 @@ func testFS() fstest.MapFS {
 		"index.html":    {Data: []byte("<h1>x</h1>")},
 		"cgi-bin/s":     {Data: []byte("#!/bin/sh s")},
 		"cgi-bin/api":   {Data: []byte("#!/bin/sh api")},
+		"setup":         {Data: []byte("#!/bin/sh setup")},
 		"secret.txt":    {Data: []byte("must not be served")},
 	}
 }
@@ -61,7 +62,7 @@ func rawRequest(t *testing.T, addr, req string) (int, string) {
 	return resp.StatusCode, string(b)
 }
 
-func TestServesOnlyTheFourFiles(t *testing.T) {
+func TestServesOnlyAllowedFiles(t *testing.T) {
 	_, addr, _ := start(t)
 	for _, f := range Served {
 		code, body := rawRequest(t, addr, "GET /f/"+f+" HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")

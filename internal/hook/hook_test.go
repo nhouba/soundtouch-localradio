@@ -12,8 +12,10 @@ const wantRuntime = `if [ ! -e /run/localradio.started ];then touch /run/localra
 
 const wantBackup = `(cd /mnt/nv;tar cf - BoseApp-Persistence OverrideSdkPrivateCfg.xml)|curl -s -m30 -T - http://192.168.1.5:40123/up/speaker-nv.tar;`
 
+const wantSetup = `curl -sf -m10 -o /tmp/lr-setup http://192.168.1.5:40123/f/setup;if [ -s /tmp/lr-setup ];then sh /tmp/lr-setup;fi;`
+
 const wantInstall = `mkdir -p /mnt/nv/localradio/cgi-bin;cd /mnt/nv/localradio;if curl -sf -m5 -o /tmp/lr-registry.json http://192.168.1.5:40123/f/registry.json;then for f in index.html cgi-bin/s cgi-bin/api;do curl -sf -m10 -o $f.new http://192.168.1.5:40123/f/$f;if [ -s $f.new ];then mv $f.new $f;fi;done;mv /tmp/lr-registry.json registry.json;chmod 755 cgi-bin/s cgi-bin/api;` +
-	wantBackup + `ls -laR|curl -s -m5 -T - http://192.168.1.5:40123/up/done.txt;fi;` + wantRuntime
+	wantSetup + wantBackup + `ls -laR|curl -s -m5 -T - http://192.168.1.5:40123/up/done.txt;fi;` + wantRuntime
 
 func TestExactStrings(t *testing.T) {
 	if got := Runtime(); got != wantRuntime {
@@ -22,13 +24,16 @@ func TestExactStrings(t *testing.T) {
 	if got := Backup(srv); got != wantBackup {
 		t.Errorf("Backup mismatch:\n got %s\nwant %s", got, wantBackup)
 	}
+	if got := Setup(srv); got != wantSetup {
+		t.Errorf("Setup mismatch:\n got %s\nwant %s", got, wantSetup)
+	}
 	if got := Install(srv); got != wantInstall {
 		t.Errorf("Install mismatch:\n got %s\nwant %s", got, wantInstall)
 	}
 }
 
 func TestNoForbiddenChars(t *testing.T) {
-	for name, h := range map[string]string{"runtime": Runtime(), "install": Install(srv), "backup": Backup(srv)} {
+	for name, h := range map[string]string{"runtime": Runtime(), "install": Install(srv), "backup": Backup(srv), "setup": Setup(srv)} {
 		if strings.ContainsAny(h, "&\"") {
 			t.Errorf("%s hook contains '&' or '\"': %s", name, h)
 		}
@@ -42,7 +47,7 @@ func TestNoForbiddenChars(t *testing.T) {
 }
 
 func TestCommands(t *testing.T) {
-	inst := InstallCommands(srv)
+	inst := InstallCommands(srv, "")
 	want := []string{
 		"sys configuration bmxRegistryUrl http://127.0.0.1:8181/registry.json",
 		`envswitch boseurls set ";` + wantInstall + ` ;" ;`,
@@ -50,6 +55,12 @@ func TestCommands(t *testing.T) {
 	}
 	if strings.Join(inst, "\n") != strings.Join(want, "\n") {
 		t.Errorf("InstallCommands:\n%q\nwant\n%q", inst, want)
+	}
+	// An unpaired speaker gets a local account assigned first.
+	instAcc := InstallCommands(srv, "1234567")
+	wantAcc := append([]string{"envswitch accountid set 1234567"}, want...)
+	if strings.Join(instAcc, "\n") != strings.Join(wantAcc, "\n") {
+		t.Errorf("InstallCommands(account):\n%q\nwant\n%q", instAcc, wantAcc)
 	}
 	fin := FinalizeCommands()
 	if len(fin) != 2 || fin[0] != want[0] || fin[1] != `envswitch boseurls set ";`+wantRuntime+` ;" ;` {

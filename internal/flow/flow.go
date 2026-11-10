@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io/fs"
 	"net"
 	"os"
@@ -69,6 +70,7 @@ type Timing struct {
 	PageTimeout   time.Duration // how long to poll the station page
 	StallTimeout  time.Duration // restart the speaker if it stops partway through the downloads
 	MaxRestarts   int           // how often to do that
+	SourceTimeout time.Duration // how long to wait for the radio source to register (unpaired only)
 }
 
 // DefaultTiming matches the behaviour of the real speaker.
@@ -81,6 +83,7 @@ var DefaultTiming = Timing{
 	PageTimeout:   90 * time.Second,
 	StallTimeout:  60 * time.Second,
 	MaxRestarts:   2,
+	SourceTimeout: 3 * time.Minute,
 }
 
 // Config configures a Runner.
@@ -135,9 +138,21 @@ type Result struct {
 	BackupDir   string `json:"backupDir"`
 	PageUp      bool   `json:"pageUp"`
 	TarReceived bool   `json:"tarReceived"`
+	Unpaired    bool   `json:"unpaired"`    // the speaker had no Bose account; a local one was assigned
+	SourceReady bool   `json:"sourceReady"` // LOCAL_INTERNET_RADIO registered (checked only when unpaired)
 }
 
 var unsafeChars = regexp.MustCompile(`[^A-Za-z0-9_-]+`)
+
+// localAccountID derives a stable 7-digit account id from the device id. A
+// speaker set up after the Bose cloud shutdown has no margeAccountUUID, and the
+// boot hook only runs once the speaker is "paired", so the installer assigns a
+// local id (never the real cloud id of another speaker).
+func localAccountID(deviceID string) string {
+	h := fnv.New32a()
+	h.Write([]byte(deviceID))
+	return strconv.Itoa(1000000 + int(h.Sum32()%9000000))
+}
 
 // BackupDirName returns <deviceID>-<YYYYMMDD-HHMMSS>.
 func BackupDirName(s speaker.Speaker, t time.Time) string {
@@ -195,6 +210,7 @@ func (r *Runner) install(ctx context.Context, ip string, p Progress) (Result, er
 	t := r.cfg.Timing
 	var res Result
 	res.PageURL = c.PageURL(ip)
+	var accountID string // non-empty only for an unpaired speaker
 
 	// 1. API backup
 	err := run(p, "backup_api", func() error {
@@ -211,6 +227,13 @@ func (r *Runner) install(ctx context.Context, ip string, p Progress) (Result, er
 		}
 		if err != nil {
 			return uerr("backup_api", err)
+		}
+		if s.AccountUUID == "" {
+			// Never paired to a Bose account (set up after the cloud shutdown):
+			// assign a local id so the boot hook runs, and fix the radio source.
+			res.Unpaired = true
+			accountID = localAccountID(s.DeviceID)
+			p.Log("speaker has no Bose account; assigning local account " + accountID)
 		}
 		dir := filepath.Join(r.cfg.BackupRoot, BackupDirName(s, r.cfg.Now()))
 		if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -263,7 +286,7 @@ func (r *Runner) install(ctx context.Context, ip string, p Progress) (Result, er
 
 	// 3. install hook + reboot
 	err = run(p, "hook", func() error {
-		out, err := speaker.RunCommands(ctx, c.ConsoleAddr(ip), t.CmdDelay, hook.InstallCommands(srvURL))
+		out, err := speaker.RunCommands(ctx, c.ConsoleAddr(ip), t.CmdDelay, hook.InstallCommands(srvURL, accountID))
 		p.Log("console: " + out)
 		if errors.Is(err, speaker.ErrHookRejected) {
 			return uerr("rejected", err)
@@ -348,6 +371,15 @@ func (r *Runner) install(ctx context.Context, ip string, p Progress) (Result, er
 
 	// 6. wait for the registry to be loaded and the page to answer
 	err = run(p, "wait", func() error {
+		if res.Unpaired {
+			// The setup script rewrote Sources.xml during the install boot, but the
+			// app had already read the old one. Reboot so it picks up the new radio
+			// source (the runtime hook set in step 5 serves the page again).
+			p.Log("rebooting so the speaker loads the new radio source")
+			if _, err := speaker.RunCommands(ctx, c.ConsoleAddr(ip), t.CmdDelay, []string{"sys reboot"}); err != nil {
+				p.Log("reboot failed: " + err.Error())
+			}
+		}
 		if err := sleep(ctx, t.FinalWait); err != nil {
 			return err
 		}
@@ -355,7 +387,7 @@ func (r *Runner) install(ctx context.Context, ip string, p Progress) (Result, er
 		for {
 			if c.PageUp(ctx, ip) {
 				res.PageUp = true
-				return nil
+				break
 			}
 			if time.Now().After(deadline) {
 				return nil // reported as a warning on the success screen
@@ -364,6 +396,24 @@ func (r *Runner) install(ctx context.Context, ip string, p Progress) (Result, er
 				return err
 			}
 		}
+		if res.Unpaired {
+			// Best-effort: wait for LOCAL_INTERNET_RADIO to register after the
+			// reboot (it appears a minute or two after boot). Not fatal.
+			deadline := time.Now().Add(t.SourceTimeout)
+			for {
+				if c.SourceReady(ctx, ip, "LOCAL_INTERNET_RADIO") {
+					res.SourceReady = true
+					break
+				}
+				if time.Now().After(deadline) {
+					break
+				}
+				if err := sleep(ctx, t.ConsoleRetry); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
 	})
 	return res, err
 }

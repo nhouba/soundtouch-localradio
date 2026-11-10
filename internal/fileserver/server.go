@@ -17,7 +17,7 @@ import (
 )
 
 // Served are the only files the speaker may download (paths below /f/).
-var Served = []string{"registry.json", "index.html", "cgi-bin/s", "cgi-bin/api"}
+var Served = []string{"registry.json", "index.html", "cgi-bin/s", "cgi-bin/api", "setup"}
 
 // Upload size limits per accepted name.
 var uploadLimits = map[string]int64{

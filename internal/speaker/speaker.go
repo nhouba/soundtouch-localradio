@@ -149,6 +149,32 @@ func (c *Client) PageURL(ip string) string {
 	return "http://" + net.JoinHostPort(ip, strconv.Itoa(c.Ports.Page)) + "/"
 }
 
+type sourcesXML struct {
+	Items []struct {
+		Source string `xml:"source,attr"`
+		Status string `xml:"status,attr"`
+	} `xml:"sourceItem"`
+}
+
+// SourceReady reports whether /sources lists the given source with
+// status="READY" (e.g. "LOCAL_INTERNET_RADIO" once the radio is registered).
+func (c *Client) SourceReady(ctx context.Context, ip, source string) bool {
+	b, err := c.Get(ctx, ip, "sources")
+	if err != nil {
+		return false
+	}
+	var x sourcesXML
+	if xml.Unmarshal(b, &x) != nil {
+		return false
+	}
+	for _, it := range x.Items {
+		if it.Source == source && it.Status == "READY" {
+			return true
+		}
+	}
+	return false
+}
+
 // PageUp reports whether the station page answers with HTTP 200.
 func (c *Client) PageUp(ctx context.Context, ip string) bool {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.PageURL(ip), nil)

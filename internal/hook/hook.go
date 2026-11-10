@@ -33,14 +33,24 @@ func Backup(srv string) string {
 		"|curl -s -m30 -T - " + srv + "/up/speaker-nv.tar;"
 }
 
-// Install downloads the station files from srv (if reachable), uploads a
-// backup and a directory listing (done.txt), then runs Runtime.
+// Setup downloads and runs the speaker/setup script from srv (if served). The
+// script makes LOCAL_INTERNET_RADIO registrable on a speaker that was never
+// paired to a Bose account; it is a no-op on paired speakers. Ends with ';'.
+// It carries no '&' or '"', so it is safe inside the stored hook.
+func Setup(srv string) string {
+	return "curl -sf -m10 -o /tmp/lr-setup " + srv + "/f/setup;" +
+		"if [ -s /tmp/lr-setup ];then sh /tmp/lr-setup;fi;"
+}
+
+// Install downloads the station files from srv (if reachable), runs the setup
+// script, uploads a backup and a directory listing (done.txt), then runs Runtime.
 func Install(srv string) string {
 	return "mkdir -p /mnt/nv/localradio/cgi-bin;cd /mnt/nv/localradio;" +
 		"if curl -sf -m5 -o /tmp/lr-registry.json " + srv + "/f/registry.json;then " +
 		"for f in index.html cgi-bin/s cgi-bin/api;do curl -sf -m10 -o $f.new " + srv + "/f/$f;" +
 		"if [ -s $f.new ];then mv $f.new $f;fi;done;" +
 		"mv /tmp/lr-registry.json registry.json;chmod 755 cgi-bin/s cgi-bin/api;" +
+		Setup(srv) +
 		Backup(srv) + "ls -laR|curl -s -m5 -T - " + srv + "/up/done.txt;fi;" + Runtime()
 }
 
@@ -63,9 +73,22 @@ func RegistryCommand() string {
 	return "sys configuration bmxRegistryUrl " + Registry
 }
 
-// InstallCommands is the console sequence that installs and reboots.
-func InstallCommands(srv string) []string {
-	return []string{RegistryCommand(), SetCommand(Install(srv)), "sys reboot"}
+// AccountCommand stores a non-empty margeAccountUUID on the speaker. Speakers
+// set up after the Bose cloud shutdown have none, and the boot hook only runs
+// once the speaker is "paired", so the installer assigns a local id first.
+func AccountCommand(accountID string) string {
+	return "envswitch accountid set " + accountID
+}
+
+// InstallCommands is the console sequence that installs and reboots. When
+// accountID is non-empty (an unpaired speaker), it is assigned first so the
+// boot hook will run.
+func InstallCommands(srv, accountID string) []string {
+	var cmds []string
+	if accountID != "" {
+		cmds = append(cmds, AccountCommand(accountID))
+	}
+	return append(cmds, RegistryCommand(), SetCommand(Install(srv)), "sys reboot")
 }
 
 // FinalizeCommands replaces the install hook by the runtime-only hook (no reboot).

@@ -36,7 +36,7 @@ var messages = map[string]map[string]string{
 
 		"pre.firmware": "This speaker has firmware %s. Version 27 or newer is required. Update the speaker first (SoundTouch app, Settings, Speaker Settings), then search again.",
 		"pre.console":  "The installer cannot reach the speaker's service port (17000). Make sure this computer is in the same network as the speaker (not a guest Wi-Fi), unplug the speaker for 10 seconds, wait 2 minutes and search again.",
-		"pre.unpaired": "This speaker looks factory-reset or not set up (it has no account). This is untested and may not work.",
+		"pre.unpaired": "This speaker has no Bose account (set up after Bose's cloud shutdown). The installer will set it up automatically; it reboots once more at the end, so the station buttons may take a minute or two to start working.",
 
 		"inst.title":    "Installing on %s",
 		"inst.firewall": "If your computer asks whether this program may accept incoming network connections, click Allow. The speaker needs to download a few files from this computer.",
